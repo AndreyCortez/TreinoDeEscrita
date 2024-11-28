@@ -1,0 +1,35 @@
+# Ignorar arquivos de compilação e binários
+bin/
+*.o
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignorar bibliotecas e arquivos temporários
+lib/
+*.a
+*.la
+*.lo
+
+# Ignorar diretório de build, se aplicável
+build/
+
+# Ignorar arquivos gerados pelo sistema operacional
+*.swp
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Ignorar configurações do VSCode
+.vscode/
+
+# Ignorar arquivos Python gerados
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignorar arquivos específicos do projeto
+br-sem-acentos.txt
