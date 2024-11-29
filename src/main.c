@@ -43,7 +43,7 @@ int word_count;
 
 float tempo_elapsado;
 float dificuldade;
-float tempo_aumento_dificuldade = 15;
+float tempo_aumento_dificuldade = 120;
 
 void jogo();
 void game_over();
@@ -132,7 +132,7 @@ void jogo() {
 
         dificuldade = 1.0 + tempo_elapsado / tempo_aumento_dificuldade;
 
-        if (RANDF() < 0.005 * dificuldade)
+        if (RANDF() < 0.01 * dificuldade)
         {
             for (int i = 0; i < QTD_MAX_PALAVRA; i++)
             {
