@@ -1,7 +1,7 @@
 # Compilador e flags
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinc
-LDFLAGS = -Llib -lraylib -lm -lpthread
+LDFLAGS = -static -Llib -lraylib -lm -lpthread
 
 # Detecta sistema operacional
 ifeq ($(OS),Windows_NT)
@@ -11,7 +11,7 @@ ifeq ($(OS),Windows_NT)
 else
     EXEC = programa
     PLATFORM = LINUX
-    LDFLAGS += -ldl
+    LDFLAGS +=
 endif
 
 # Diretórios

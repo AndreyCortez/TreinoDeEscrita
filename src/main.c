@@ -11,6 +11,7 @@
 #include "palavra.h"
 #include "raymath.h"
 #include "lista_palavras.h"
+#include "macros.h"
 
 semaphore_t *semaforo_escrita;
 
@@ -20,11 +21,6 @@ semaphore_t *semaforo_escrita;
 #define RESX 800
 #define RESY 800
 
-#define RANDF() (float)rand()/(float)RAND_MAX
-#define RANDINT(X) (int)(RANDF() * X)
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 // Parâmetros globais
 semaphore_t calc_semaforo; // Semáforo para cálculo de estatísticas
@@ -33,18 +29,24 @@ int indice_palavra = 0;
 
 pthread_t threads[QTD_MAX_PALAVRA];
 palavra *palavras[QTD_MAX_PALAVRA];
-int id_palavras[QTD_MAX_PALAVRA];
 int num_palavras = 0;
 
-int score = 0;
+int score;
+int vidas;
 
 float sample_time = 5.0;
-float cpm = 0;
-int char_count = 0;
+float cpm;
+int char_count;
 
-float wpm = 0;
-int word_count = 0;
+float wpm;
+int word_count;
 
+float tempo_elapsado;
+float dificuldade;
+float tempo_aumento_dificuldade = 15;
+
+void jogo();
+void game_over();
 
 // Função de pausa compatível com Windows e Linux
 void sleep(int ms) {
@@ -52,30 +54,6 @@ void sleep(int ms) {
     ts.tv_sec = ms / 1000;              
     ts.tv_nsec = (ms % 1000) * 1000000; 
     nanosleep(&ts, NULL);
-}
-
-void *checar_palavra(void* arg)
-{
-    int id = *(int*)arg;
-    if (palavras[id] == NULL)
-        return NULL;
-    
-    if (strcmp(palavras[id]->pal, palavra_digitada) == 0)
-    {
-        score += strlen(palavras[id]->pal);
-
-        semaphore_wait(&calc_semaforo); 
-
-        char_count += strlen(palavras[id]->pal);
-        word_count += 1;
-
-        semaphore_post(&calc_semaforo); 
-
-        palavra_destruir(&(palavras[id]));
-        printf("palavra destruida\n");
-    }
-
-    return NULL;
 }
 
 void *calcular_estatisticas(void *arg)
@@ -91,16 +69,58 @@ void *calcular_estatisticas(void *arg)
         word_count = 0;
 
         semaphore_post(&calc_semaforo); 
-        printf("%f %f\n", cpm, wpm);
         sleep(sample_time * 1000);
     }
 }
 
+void renderizar_estatisticas()
+{
+    DrawRectangle(0, 0, 180, 130, (Color){ 130, 130, 130, 50});
+    char aux_text[100] = "\0";
+    sprintf(aux_text, "SCORE: %03d\nWPM: %.2f\nCPM: %.2f\nVIDAS: %d", score, wpm, cpm, vidas);
+    DrawText(aux_text, 0, 0, 30, GREEN);
+}
 
-void* jogo(void* arg) {
-    
+void game_over()
+{
     for (int i = 0; i < QTD_MAX_PALAVRA; i++)
-        id_palavras[i] = i;
+            palavra_destruir(&(palavras[i]));
+
+    while (!WindowShouldClose()) 
+    {
+        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
+        {
+            jogo();
+        }
+
+        BeginDrawing();
+
+        ClearBackground(BLACK);
+
+        char message[] = "VOCE PERDEU APERTE ENTER OU ESPAÇO PARA REINICIAR";
+        float dist = MeasureText(message, 20);
+        DrawText(message, (RESX - dist) / 2, RESY/2, 20, WHITE);
+
+        renderizar_estatisticas();
+
+        EndDrawing();
+    }
+}
+
+void jogo() {
+
+    // Seta as variáveis iniciais do jogo
+    tempo_elapsado = 0.0;
+    dificuldade = 1.0;
+
+    vidas = 10;
+    score = 0;
+
+    wpm = 0;
+    word_count = 0;
+    
+    cpm = 0;
+    char_count = 0;
 
     pthread_t stat_thread;
     pthread_create(&stat_thread, NULL, calcular_estatisticas, NULL);
@@ -108,16 +128,17 @@ void* jogo(void* arg) {
     while (!WindowShouldClose()) {
         
         float delta = GetFrameTime();
+        tempo_elapsado += delta;
 
-        if (RANDF() < 0.01)
+        dificuldade = 1.0 + tempo_elapsado / tempo_aumento_dificuldade;
+
+        if (RANDF() < 0.005 * dificuldade)
         {
             for (int i = 0; i < QTD_MAX_PALAVRA; i++)
             {
                 if (palavras[i] == NULL)
                 {
-                    palavras[i] = palavra_criar(lista_palavras_br[RANDINT(200000)], 20);
-                    palavras[i]->position.x *= (RESX * 0.7);
-                    printf("palavra criada\n");
+                    palavras[i] = palavra_criar(lista_palavras_br[RANDINT(200000)],  10 + RANDF() * 10 * dificuldade, (Vector2){RANDF() * RESX * 0.7, 0.0});
                     break;
                 }
             }
@@ -148,14 +169,26 @@ void* jogo(void* arg) {
 
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
         {
-            printf("checar palavra!\n");
             
             for (int i = 0; i < QTD_MAX_PALAVRA; i++)
-                pthread_create(&threads[i], NULL, checar_palavra, &id_palavras[i]);
+            {
+                if (palavras[i] != NULL)
+                {
+                    if (palavras[i]->aprovada)
+                    {
+                        semaphore_wait(&calc_semaforo); 
+                        
+                        score += palavras[i]->tamanho;
+                        char_count += palavras[i]->tamanho;
+                        word_count += 1;
 
-            for (int i = 0; i < QTD_MAX_PALAVRA; i++)
-                pthread_join(threads[i], NULL);
+                        semaphore_post(&calc_semaforo); 
 
+                        palavra_destruir(&(palavras[i]));
+                    }
+                }
+            }
+            
             printf("%s\n", palavra_digitada);
 
             indice_palavra = 0;
@@ -166,89 +199,42 @@ void* jogo(void* arg) {
         {
             if (palavras[i] != NULL)
             {
-                palavras[i]->position.y += (palavras[i]->velocity) * delta;      
+                palavras[i]->position.y += (palavras[i]->velocity) * delta; 
+                palavra_checar(palavras[i], palavra_digitada);
+
                 if (palavras[i]->position.y > RESY)
+                {
                     palavra_destruir(&(palavras[i]));
+
+                    vidas--;
+                    if (vidas <= 0)
+                    {
+                        game_over();
+                        return;
+                    }
+                }
+
             }     
         }
 
-
         BeginDrawing();
+
         ClearBackground(BLACK); 
 
         for (int i =0; i < QTD_MAX_PALAVRA; i++)
         {
             if (palavras[i] != NULL)
-            {
-                char *c = palavras[i]->pal;
-                int correct = 0;
-                int incorrect = 0;
-                char cor[100] = "\0";
-                char inc[100] = "\0";
-                char rest[100] = "\0";
-                char extra[100] = "\0";
-
-                int tam_pal = strlen(palavras[i]->pal);
-                int tam_pal_digitada = strlen(palavra_digitada);
-
-                while (*c != '\0')
-                {
-                    if (*c == *((palavra_digitada) + correct))
-                    {
-                        cor[correct] = *c;
-                        cor[correct + 1] = '\0';
-                        correct += 1;
-                    }
-                    else 
-                    {
-                        incorrect = MIN(tam_pal_digitada - correct, tam_pal - correct);
-
-                        for (int j = 0; j < incorrect; j++)
-                        {
-                            inc[j] = *c;
-                            inc[j + 1] = '\0';
-                            c += 1;
-                        }
-
-                        for (int j = 0; j < tam_pal - (incorrect + correct); j++)
-                        {
-                            rest[j] = *c;
-                            rest[j + 1] = '\0';
-                            c += 1;
-                        }     
-
-                        break;
-                    }
-                    c += 1;
-                }
-                
-                if (tam_pal_digitada > tam_pal && correct >= tam_pal)
-                {
-                    cor[0] = '\0';
-                    strcpy(extra, palavras[i]->pal);
-                }
-
-                
-                DrawText(cor, palavras[i]->position.x, palavras[i]->position.y, 20, GREEN);
-                int dist = MeasureText(cor, 20);
-                DrawText(inc, palavras[i]->position.x + dist, palavras[i]->position.y, 20, RED);
-                dist = MeasureText(cor, 20) + MeasureText(inc, 20);
-                DrawText(rest, palavras[i]->position.x + dist, palavras[i]->position.y, 20, WHITE);
-                DrawText(extra, palavras[i]->position.x, palavras[i]->position.y, 20, YELLOW);
-            }
+                palavra_renderizar(palavras[i], 20);
         }
 
-        char aux_text[100];
-
-        sprintf(aux_text, "SCORE: %03d\nWPM: %.2f\nCPM: %.2f\n", score, wpm, cpm);
-        DrawText(aux_text, 0, 0, 30, GREEN);
+        renderizar_estatisticas();
 
         EndDrawing();
     }
 
     pthread_cancel(stat_thread);
 
-    return NULL;
+    return;
 }
 
 int main() {
@@ -261,7 +247,7 @@ int main() {
     semaphore_init(&calc_semaforo, 1);
 
     SetTargetFPS(60); 
-    jogo(NULL);
+    jogo();
 
     semaphore_destroy(&calc_semaforo);
     CloseWindow();
