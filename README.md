@@ -19,16 +19,16 @@ de algumas das adiçoes feitas pela thread principal serem perdidas durante o us
 dessa memória compartilhada.
 
 ```c
-#thread secundária
-wpm = word_count / 5.0 # calcula palavras por minuto
+// thread secundária
+wpm = word_count / 5.0 // calcula palavras por minuto
 
 
 # muda para a trhead principal
-word_count += 1 # uma palavra adicional foi digitada
+word_count += 1 // uma palavra adicional foi digitada
 
 # muda para a thread secundária
-word_count = 0 # zera as palavras, perdendo assim a palavra que foi 
-	       # digitada antes
+word_count = 0 // zera as palavras, perdendo assim a palavra que foi 
+	       // digitada antes
 
 ```
 
