@@ -13,7 +13,7 @@
 #include "lista_palavras.h"
 #include "macros.h"
 
-semaphore_t *semaforo_escrita;
+sem_t *semaforo_escrita;
 
 #define TAM_MAX_PALAVRA 100
 #define QTD_MAX_PALAVRA 100
@@ -23,7 +23,7 @@ semaphore_t *semaforo_escrita;
 
 
 // Parâmetros globais
-semaphore_t calc_semaforo; // Semáforo para cálculo de estatísticas
+sem_t calc_semaforo; // Semáforo para cálculo de estatísticas
 char palavra_digitada[TAM_MAX_PALAVRA];
 int indice_palavra = 0;
 
@@ -43,7 +43,7 @@ int word_count;
 
 float tempo_elapsado;
 float dificuldade;
-float tempo_aumento_dificuldade = 120;
+float tempo_aumento_dificuldade = 1;
 
 void jogo();
 void game_over();
@@ -60,7 +60,7 @@ void *calcular_estatisticas(void *arg)
 {   
     while (!WindowShouldClose())
     {
-        semaphore_wait(&calc_semaforo); 
+        sem_wait(&calc_semaforo); 
 
         cpm = (float)char_count * 60.0 / sample_time;
         wpm = (float)word_count * 60.0 / sample_time;
@@ -68,7 +68,7 @@ void *calcular_estatisticas(void *arg)
         char_count = 0;
         word_count = 0;
 
-        semaphore_post(&calc_semaforo); 
+        sem_post(&calc_semaforo); 
         sleep(sample_time * 1000);
     }
 }
@@ -91,6 +91,7 @@ void game_over()
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
         {
             jogo();
+            return;
         }
 
         BeginDrawing();
@@ -176,13 +177,13 @@ void jogo() {
                 {
                     if (palavras[i]->aprovada)
                     {
-                        semaphore_wait(&calc_semaforo); 
+                        sem_wait(&calc_semaforo); 
                         
                         score += palavras[i]->tamanho;
                         char_count += palavras[i]->tamanho;
                         word_count += 1;
 
-                        semaphore_post(&calc_semaforo); 
+                        sem_post(&calc_semaforo); 
 
                         palavra_destruir(&(palavras[i]));
                     }
@@ -244,12 +245,12 @@ int main() {
     InitWindow(screenWidth, screenHeight, "Raylib - Pêndulos Acoplados");
 
     // Inicializa semáforo
-    semaphore_init(&calc_semaforo, 1);
+    sem_init(&calc_semaforo, NULL, 1);
 
     SetTargetFPS(60); 
     jogo();
 
-    semaphore_destroy(&calc_semaforo);
+    sem_destroy(&calc_semaforo);
     CloseWindow();
 
     return 0;

@@ -1,7 +1,7 @@
 # Compilador e flags
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinc
-LDFLAGS = -static -Llib -lraylib -lm -lpthread
+CFLAGS = -Wall -Wextra -I$(INC_DIR)
+LDFLAGS = -L$(LIB_DIR) -lraylib -lm -lpthread
 
 # Detecta sistema operacional
 ifeq ($(OS),Windows_NT)
@@ -11,7 +11,9 @@ ifeq ($(OS),Windows_NT)
 else
     EXEC = programa
     PLATFORM = LINUX
-    LDFLAGS +=
+    # Removi a flag -static para linkagem dinâmica
+    # Se desejar linkagem estática, remova o comentário da linha abaixo
+    # LDFLAGS += -static
 endif
 
 # Diretórios
@@ -28,7 +30,7 @@ SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 
 # Regras principais
-all: $(TARGET)
+all: setup $(TARGET)
 
 # Gera o executável
 $(TARGET): $(OBJS)
@@ -44,8 +46,9 @@ setup:
 
 # Limpeza dos binários e objetos
 clean:
-	rm -rf $(BIN_DIR)
+	rm -f $(BIN_DIR)/*
 
 # Atalho para rodar o programa
 run: all
 	./$(TARGET)
+
